@@ -1,0 +1,109 @@
+---
+title: "Midterm Mini"
+author: "Divya Rao"
+date: "2023-10-09"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question
+
+The Statistics & Data Science Department at CMU is interested in supporting students' writing in their introductory courses. They are concerned what the arrival of ChatGPT (and other generative models) might do to students' learning and performance.
+
+With that in mind, they've generated 100 introductions using the prompt from Project 1 in 36-200 (Reasoning with data). They've also randomly sampled 100 introductions from a corpus of student papers collected prior to ChatGPT's introduction, and 100 introductions from published academic papers sampled from a corpus of open access STEM-oriented journals (e.g., journals in cellular biology, materials science, electrical engineering, etc.).
+
+They've tasked you with describing how writing produced by ChatGPT is similar to/different from the writing produced by students. Your description should be one that helps the department understand global patterns in the writing produced by different classes of authors (novice, expert, and machine) and helps them plan what they might want to do next (collect more data, different data, proceed with different analyses, etc.).
+
+They would like you to produce a 2-page document containing:
+
+An executive summaryLinks to an external site. (roughly 1/2 page)
+A report of your methods and findings (1 page)
+Recommendations for next-steps (1/2 page)
+ReferencesLinks to an external site. to at least 3 sources that help your client understand your methods, findings, or both.
+The data is on Canvas. They include a midterm_data Download midterm_datacontaining a *.csv file.
+
+
+```{r}
+library(cmu.textstat)
+library(tidyverse)
+library(quanteda)
+library(quanteda.textstats)
+library(stringr)
+df <- read.csv("./midterm_mini_intros.csv")
+df$text_type <- str_extract(df$doc_id, "^[a-z]+")
+sc <- df %>% corpus()
+sc_tokens <- tokens(sc, 
+    include_docvars = TRUE, 
+    remove_punct = TRUE, 
+    remove_numbers = TRUE,
+    remove_symbols = TRUE, 
+    what = "word")
+custom_stopwords <- c("zzzz")
+sc_tokens <- tokens_remove(sc_tokens, custom_stopwords)
+sc_dfm <- dfm(sc_tokens)
+```
+```{r}
+chatgpt_word_freq <- textstat_frequency(dfm(subset(sc_tokens, df$text_type == "chatgpt")))
+print(head(chatgpt_word_freq , 20))
+```
+
+```{r}
+published_word_freq <- textstat_frequency(dfm(subset(sc_tokens, df$text_type == "published")))
+print(head(published_word_freq, 20))
+```
+
+```{r}
+sub_dfm1 <- dfm_subset(sc_dfm, text_type == "chatgpt" | text_type == "student")
+sc_kw1 <- textstat_keyness(sub_dfm1, 
+            docvars(sub_dfm1, "text_type") == "chatgpt", 
+            measure = "lr")
+kableExtra::kbl(head(sc_kw1),
+  caption = "Keyness Values - chatgpt vs student",
+  booktabs = T, 
+  linesep = "", 
+  digits = 2
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+```
+
+```{r}
+sub_dfm2 <- dfm_subset(sc_dfm, text_type == "chatgpt" | text_type == "published")
+sc_kw2 <- textstat_keyness(sub_dfm2, 
+            docvars(sub_dfm2, "text_type") == "chatgpt", 
+            measure = "lr")
+kableExtra::kbl(head(sc_kw2),
+  caption = "Keyness Values - chatgpt vs published",
+  booktabs = T, 
+  linesep = "", 
+  digits = 2
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+```
+
+```{r}
+sub_dfm3 <- dfm_subset(sc_dfm, text_type == "published" | text_type == "student")
+sc_kw3 <- textstat_keyness(sub_dfm3, 
+            docvars(sub_dfm3, "text_type") == "published", 
+            measure = "lr")
+kableExtra::kbl(head(sc_kw3),
+  caption = "Keyness Values - published vs student",
+  booktabs = T, 
+  linesep = "", 
+  digits = 2
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+```
+
+# TODOs:
+
+# parts of speech tagging
+
+# logistic regression
+
+
