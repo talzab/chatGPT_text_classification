@@ -1,0 +1,233 @@
+---
+title: "text analysis midterm"
+author: "Tilina Alzaben"
+date: "2023-10-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(quanteda)
+library(quanteda.textstats)
+```
+
+```{r}
+data <- read.csv("Text Analysis/midterm_data/midterm_mini_intros.csv")
+knitr::kable(substr(data$text[1], start = 1, stop = 1000), col.names = "Sample of Text")
+```
+
+```{r}
+# Creating a Corpus 
+wc <- corpus(data)
+
+# Returns the total and unique number of tokens, as well as number of sentences.
+knitr::kable(head(wc %>% summary()), caption = "Partial Sample of Writing Corpus.")
+```
+
+```{r}
+# Document Variables 
+doc_categories <- str_extract(data$doc_id, "^[a-z]+")
+knitr::kable(doc_categories %>% unique(), col.names = "Writing Level")
+
+# Assigning the Levels Back
+docvars(wc, field = "text_type") <- doc_categories
+knitr::kable(head(wc %>% summary()), caption = "Partial summary of sample corpus.")
+```
+
+```{r}
+# Tokenizing 
+wc_tokens <- tokens(wc, include_docvars = TRUE, remove_punct = TRUE, remove_numbers = TRUE, 
+                    remove_symbols = TRUE, what = "word")
+wc_tokens <- tokens_tolower(wc_tokens)
+wc_tokens <- tokens_select(wc_tokens, pattern = stopwords("en"), selection = "remove")
+```
+
+```{r}
+library(tidytext)
+wc_tokens_tf <- data %>%
+  unnest_tokens(word, text)
+
+doc_categories <- str_extract(wc_tokens_tf$doc_id, "^[a-z]+")
+wc_tokens_tf <- cbind(wc_tokens_tf, doc_categories)
+
+wc_token_summary <- wc_tokens_tf %>%
+  group_by(doc_categories, word) %>%
+  count() %>%
+  ungroup() 
+
+wc_token_summary <- wc_token_summary %>%
+  bind_tf_idf(word, doc_categories, n)
+
+wc_token_summary %>%
+  filter(doc_categories %in% c("chatgpt", "student", "published")) %>%
+  group_by(doc_categories) %>%
+  slice_max(tf_idf, n = 10, with_ties = FALSE) %>%
+  ungroup() %>%
+  mutate(stem = reorder_within(word, tf_idf,
+                               doc_categories)) %>%
+  ggplot(aes(y = tf_idf, x = stem), alpha = 0.5) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  scale_x_reordered() +
+  facet_wrap(~ doc_categories, ncol = 2, 
+             scales = "free") +
+  labs(y = "TF-IDF", x = NULL)
+```
+
+```{r}
+# Create a Document Feature Matrix
+wc_dfm <- dfm(wc_tokens)
+prop_dfm <- dfm_weight(wc_dfm, scheme = "prop")
+```
+
+```{r}
+# More Frequent Tokens
+freq_df <- textstat_frequency(wc_dfm) %>% data.frame(stringsAsFactors = F)
+knitr::kable(freq_df[1:10,], caption = "The 10 most frequent tokens in the sample corpus.")
+```
+
+```{r}
+# Keyness
+corpus_comp <- ntoken(wc_dfm) %>% 
+  data.frame(Tokens = .) %>%
+  rownames_to_column("Text_Type") %>%
+  mutate(Text_Type = str_extract(Text_Type, "^[a-z]+")) %>%
+  group_by(Text_Type) %>%
+  summarize(Texts = n(),
+    Tokens = sum(Tokens)) %>%
+  mutate(Text_Type = c("ChatGPT", "Published", "Student")) %>%
+  rename("Text-Type" = Text_Type) %>%
+  janitor::adorn_totals()
+
+kableExtra::kbl(corpus_comp, caption = "Composition", booktabs = T, linesep = "") %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+```
+
+```{r}
+# Most Frequent Keyness Terms by Writing Level
+chatgpt_kw <- textstat_keyness(wc_dfm, docvars(wc_dfm, "text_type") == "chatgpt", measure = "lr")
+
+kableExtra::kbl(head(chatgpt_kw), caption = "Tokens with the highest keyness values in ChatGPT text-type compared to the rest of the sample corpus.", booktabs = T, linesep = "", digits = 2) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+
+student_kw <- textstat_keyness(wc_dfm, docvars(wc_dfm, "text_type") == "student", measure = "lr")
+
+kableExtra::kbl(head(student_kw), caption = "Tokens with the highest keyness values in Student text-type compared to the rest of the sample corpus.", booktabs = T, linesep = "", digits = 2) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+
+published_kw <- textstat_keyness(wc_dfm, docvars(wc_dfm, "text_type") == "published", measure = "lr")
+
+kableExtra::kbl(head(published_kw), caption = "Tokens with the highest keyness values in Published text-type compared to the rest of the sample corpus.", booktabs = T, linesep = "", digits = 2) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+```
+
+```{r}
+# Creating a Sub-Corpa
+sub_dfm <- dfm_subset(wc_dfm, text_type == "chatgpt" | text_type == "student")
+sub_dfm <- dfm_trim(sub_dfm, min_termfreq = 1)
+
+student_kw <- textstat_keyness(sub_dfm, docvars(sub_dfm, "text_type") == "student", measure = "lr")
+kableExtra::kbl(head(student_kw), caption = "Tokens with the highest keyness values in student text-type when compared to ChatGPT text-type.", booktabs = T, linesep = "", digits = 2) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+```
+
+
+```{r}
+# The Effect Size
+chatgpt_dfm <- dfm_subset(wc_dfm, text_type == "chatgpt") %>% dfm_trim(min_termfreq = 1)
+student_dfm <- dfm_subset(wc_dfm, text_type == "student") %>% dfm_trim(min_termfreq = 1)
+
+chatgpt_kw <- keyness_table(chatgpt_dfm, student_dfm)
+
+kableExtra::kbl(head(chatgpt_kw), caption = "Tokens with the highest keyness values in the ChatGPT text-type when compared to the Student text-type.", booktabs = T, linesep = "", digits = 2) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::kable_classic()
+```
+
+
+```{r}
+library(nFactors)
+
+wc_counts <- wc_tokens %>%
+  tokens_lookup(dictionary = ds_dict, levels = 1, valuetype = "fixed") %>%
+  dfm() %>%
+  convert(to = "data.frame") %>%
+  as_tibble()
+
+tot_counts <- quanteda::ntoken(wc_tokens) %>%
+  data.frame(tot_counts = .) %>%
+  tibble::rownames_to_column("doc_id") %>%
+  dplyr::as_tibble()
+
+ds_counts <- dplyr::full_join(wc_counts, tot_counts, by = "doc_id")
+
+ds_counts <- ds_counts %>%
+  dplyr::mutate_if(is.numeric, list(~./tot_counts), na.rm = TRUE) %>%
+  dplyr::mutate_if(is.numeric, list(~.*100), na.rm = TRUE) %>%
+  dplyr::select(-tot_counts)
+
+doc_categories <- str_extract(ds_counts$doc_id, "^[a-z]+")
+ds_counts <- cbind(ds_counts, doc_categories) %>%
+  mutate(doc_categories = as.factor(doc_categories)) 
+
+micusp_mda <- mda_loadings(ds_counts, n_factors = 3)
+
+micusp_mda %>%
+  ggplot(aes(x = Factor1, y = Factor2, color = group)) +
+  geom_point()
+
+f1_lm <- lm(Factor1 ~ group, data = micusp_mda)
+names(f1_lm$coefficients) <- names(coef(f1_lm)) %>% str_remove("group")
+f2_lm <- lm(Factor2 ~ group, data = micusp_mda)
+names(f2_lm$coefficients) <- names(coef(f2_lm)) %>% str_remove("group")
+f3_lm <- lm(Factor3 ~ group, data = micusp_mda)
+names(f3_lm$coefficients) <- names(coef(f3_lm)) %>% str_remove("group")
+
+jtools::export_summs(f1_lm, f2_lm, f3_lm, 
+                     statistics = c(DF = "df.residual", 
+                                    R2 = "r.squared", "F statistic" = "statistic"), 
+                     model.names = c("Factor 1", "Factor 2", "Factor 3"),
+                     error_format = "",
+  error_pos = "same")
+
+mda.biber::heatmap_mda(micusp_mda, n_factor = 1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
