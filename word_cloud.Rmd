@@ -2,5 +2,93 @@
 title: "generation of word clouds for each category: chatgpt, novice, expert"
 author: "Tilina Alzaben, Marion Haney"
 date: "10-13-2023"
-output: pdf_document
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    code_folding: show
+    toc: yes
+    toc_float: yes
+editor_options:
+  chunk_output_type: console
 ---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(tidytext)
+library(SnowballC)
+library(wordcloud)
+```
+
+
+Load in the data.
+```{r}
+df <- read.csv("midterm_mini_intros.csv")
+```
+
+
+Preprocess text
+```{r}
+# Create long-format (each row is a token)
+df_long <- df %>%
+  unnest_tokens(word, text)
+
+# Remove stop words
+data(stop_words) # tidytext list of stop words
+df_long <- df_long %>%
+  filter(!(word %in% stop_words$word))
+
+# Use stem of the word
+df_long <- df_long %>%
+  mutate(stem = wordStem(word))
+```
+
+
+Create word clouds for chatgpt, novice, and expert.
+```{r}
+df_long$doc_type <- gsub("_.*", "", df_long$doc_id)
+  
+# Get tokens summary
+tokens_summary <- df_long %>%
+  group_by(doc_type, stem) %>%
+  count() %>%
+  ungroup()
+```
+
+
+Chatgpt wordcloud
+```{r}
+chatgpt_tokens <- filter(tokens_summary, doc_type == "chatgpt")
+
+wordcloud(words = chatgpt_tokens$stem,
+                             freq = chatgpt_tokens$n,
+                             random.order = FALSE,
+                             max.words = 100,
+                             colors = brewer.pal(8, "Dark2"))
+```
+
+
+Novice wordcloud
+```{r}
+novice_tokens <- filter(tokens_summary, doc_type == "student")
+
+wordcloud(words = novice_tokens$stem,
+                             freq = novice_tokens$n,
+                             random.order = FALSE,
+                             max.words = 100,
+                             colors = brewer.pal(8, "Dark2"))
+```
+
+
+Expert wordcloud
+```{r}
+expert_tokens <- filter(tokens_summary, doc_type == "published")
+
+wordcloud(words = expert_tokens$stem,
+                             freq = expert_tokens$n,
+                             random.order = FALSE,
+                             max.words = 100,
+                             colors = brewer.pal(8, "Dark2"))
+```
