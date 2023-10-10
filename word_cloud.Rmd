@@ -1,6 +1,6 @@
 ---
 title: "generation of word clouds for each category: chatgpt, novice, expert"
-author: "Tilina Alzaben, Marion Haney"
+author: "Tilina Alzaben, Marion Haney, Divya Rao"
 date: "10-13-2023"
 output:
   pdf_document:
