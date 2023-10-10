@@ -16,7 +16,7 @@ library(quanteda.textstats)
 ```
 
 ```{r}
-data <- read.csv("Text Analysis/midterm_data/midterm_mini_intros.csv")
+data <- read.csv("midterm_mini_intros.csv")
 knitr::kable(substr(data$text[1], start = 1, stop = 1000), col.names = "Sample of Text")
 ```
 ```{r}
