@@ -1,7 +1,0 @@
----
-title: "36668 Text Analysis Midterm"
-subtitle: "F23 36668 Text Analysis Midterm"
-author: "Tilina Alzaben, Marion Haney, Divya Rao"
-date: "10-13-2023"
-output: pdf_document
----
